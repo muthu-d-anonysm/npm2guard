@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+downloaded_files_*/
+.env
+config.json
