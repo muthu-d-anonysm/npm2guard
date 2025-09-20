@@ -20,7 +20,9 @@ npm2guard is a tool to scan GitHub organizations' repositories for vulnerable NP
 Requires Python 3.6 or higher.
 
 git clone https://github.com/muthu-d-anonysm/npm2guard.git
+
 cd npm2guard
+
 pip install -r requirements.txt
 
 ---
