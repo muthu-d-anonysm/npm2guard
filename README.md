@@ -29,7 +29,9 @@ pip install -r requirements.txt
 
 ## Usage
 
-1. Scan a single organization: python scanner.py --org target
+1. Scan a single organization:
+  
+python scanner.py --org target
 
 You will be prompted to enter your GitHub personal access token (recommended to use fine-grained tokens starting with `github_pat_`).
 
