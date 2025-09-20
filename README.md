@@ -19,11 +19,9 @@ npm2guard is a tool to scan GitHub organizations' repositories for vulnerable NP
 
 Requires Python 3.6 or higher.
 
-git clone https://github.com/muthu-d-anonysm/npm2guard.git
-
-cd npm2guard
-
-pip install -r requirements.txt
+- git clone https://github.com/muthu-d-anonysm/npm2guard.git
+- cd npm2guard
+- pip install -r requirements.txt
 
 ---
 
@@ -31,16 +29,14 @@ pip install -r requirements.txt
 
 1. Scan a single organization:
   
-      python scanner.py --org target
+- python scanner.py --org target
 
 You will be prompted to enter your GitHub personal access token (recommended to use fine-grained tokens starting with `github_pat_`).
 
 
 2. Scan multiple organizations:
    
-      python scanner.py --org-file targets.txt
-
-
+- python scanner.py --org-file targets.txt
 
 `targets.txt` contains one organization name per line.
 
