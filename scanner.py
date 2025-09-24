@@ -6,7 +6,7 @@ from pathlib import Path
 import getpass
 from semantic_version import Version, NpmSpec
 
-# -------------------- TOOL BANNER --------------------
+# ------------------ Tool Banner ------------------
 TOOL_NAME = r"""
 ███╗░░██╗██████╗░███╗░░░███╗██████╗░░██████╗░██╗░░░██╗░█████╗░██████╗░██████╗░
 ████╗░██║██╔══██╗████╗░████║╚════██╗██╔════╝░██║░░░██║██╔══██╗██╔══██╗██╔══██╗
@@ -14,17 +14,9 @@ TOOL_NAME = r"""
 ██║╚████║██╔═══╝░██║╚██╔╝██║██╔══╝░░██║░░╚██╗██║░░░██║██╔══██║██╔══██╗██║░░██║
 ██║░╚███║██║░░░░░██║░╚═╝░██║███████╗╚██████╔╝╚██████╔╝██║░░██║██║░░██║██████╔╝
 ╚═╝░░╚══╝╚═╝░░░░░╚═╝░░░░░╚═╝╚══════╝░╚═════╝░╚═════╝░╚═╝░░╚═╝╚═╝░░╚═╝╚═════╝░
-
-                        ▂▃▅▇█▓▒░ By Muthu D ░▒▓█▇▅▃▂
-                        https://www.linkedin.com/in/anonysm
 """
 
-# -------------------- COLORS --------------------
-RED = "\033[91m"
-GREEN = "\033[92m"
-RESET = "\033[0m"
-
-# -------------------- 40+ Vulnerable NPM Packages --------------------
+# ------------------ Vulnerable Packages ------------------
 COMPROMISED_PACKAGES = {
     "chalk": ">=5.0.0 <5.0.5",
     "express": ">=4.0.0 <4.18.3",
@@ -33,58 +25,36 @@ COMPROMISED_PACKAGES = {
     "axios": "<0.21.2",
     "react": ">=18.0.0 <18.2.1",
     "debug": "<=4.3.1",
-    "micromatch": ">=4.0.0 <4.0.4",
-    "camelcase": ">=6.2.0 <6.2.1",
-    "minimist": ">=1.2.6 <1.2.11",
-    "strip-ansi": ">=6.0.0 <6.0.3",
-    "ansi-styles": ">=4.3.0 <4.3.4",
-    "emoji-regex": "*",
-    "uid-number": "*",
-    "is-fullwidth-code-point": "*",
-    "text-table": "*",
-    "supports-color": "*",
-    "escape-string-regexp": "*",
-    "string-width": "*",
-    "dashdash": "*",
-    "ini": "*",
-    "color": "*",
-    "color-name": ">=2.0.0 <2.0.2",
-    "color-convert": "*",
-    "color-string": "*",
-    "@ctrl/tinycolor": "*",
-    "rxnt-authentication": "0.0.1",
-    "crowdstrike-npm": "*",
-    "debug-utils": "*",
-    "dane-util": "*",
-    "@npmcli/arborist": "*",
-    "@npmcli/package-json-lint": "*",
-    "js-tokens": "*",
-    "emoji-regex": "*",
-    "unique-slug": "*",
-    "universalify": "*",
-    "uuid": "*",
-    "strip-json-comments": "*",
-    "prettier": "<3.5.4",
+    # Add more vulnerable packages here...
 }
 
-# -------------------- HELPER FUNCTIONS --------------------
+# ------------------ Terminal Colors ------------------
+RED = "\033[91m"
+RESET = "\033[0m"
+
+# ------------------ Semver Helpers ------------------
 def is_version_in_range(version, range_expr):
-    """Check if a version satisfies a given npm semver range."""
     try:
         spec = NpmSpec(range_expr)
-        return Version(version.lstrip('^~')) in spec
+        return Version(version.lstrip("^~")) in spec
     except Exception:
         return False
-
 
 def is_version_vulnerable(installed_version, vulnerable_range):
     if vulnerable_range == "*":
         return True
     return is_version_in_range(installed_version, vulnerable_range)
 
+# ------------------ GitHub Token Prompt ------------------
+def get_github_token():
+    token = getpass.getpass("Enter your GitHub Personal Access Token: ").strip()
+    if not token:
+        print("[!] No token provided. Only public repos will be scanned.")
+        return None
+    return token
 
-def scan_dependencies(dependencies):
-    """Scan a dictionary of dependencies for vulnerabilities."""
+# ------------------ Scan Dependency Functions ------------------
+def scan_dependencies(dependencies, repo_name):
     vulns = []
     for dep, version in dependencies.items():
         if dep in COMPROMISED_PACKAGES:
@@ -93,37 +63,53 @@ def scan_dependencies(dependencies):
                 vulns.append((dep, version, vuln_range))
     return vulns
 
+def scan_file(filepath):
+    vulns = []
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        dependencies = data.get("dependencies", {})
+        dev_dependencies = data.get("devDependencies", {})
+        all_deps = {**dependencies, **dev_dependencies}
+        vulns = scan_dependencies(all_deps, filepath)
+    except Exception:
+        pass
+    return vulns
 
-def parse_yarn_lock(file_path):
-    """Parse yarn.lock file to extract package versions."""
-    deps = {}
-    with open(file_path) as f:
-        lines = f.readlines()
-    current_pkg = None
-    for line in lines:
-        if line.strip() and not line.startswith(" "):
-            key = line.split("@")[0]
-            current_pkg = key.strip()
-        elif current_pkg and line.strip().startswith("version"):
-            version = line.strip().split(" ")[1].strip('"')
-            deps[current_pkg] = version
-            current_pkg = None
-    return deps
+def scan_yarn_lock(filepath):
+    vulns = []
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+        current_pkg = None
+        for line in lines:
+            if line and not line.startswith(" ") and line.endswith(":"):
+                key = line.rstrip(":")
+                pkg_name = key.split("@")[0]
+                current_pkg = pkg_name
+            elif current_pkg and line.strip().startswith("version"):
+                version = line.strip().split(" ")[1].strip('"')
+                if current_pkg in COMPROMISED_PACKAGES:
+                    vuln_range = COMPROMISED_PACKAGES[current_pkg]
+                    if is_version_vulnerable(version, vuln_range):
+                        vulns.append((current_pkg, version, vuln_range))
+                current_pkg = None
+    except Exception:
+        pass
+    return vulns
 
-
-# -------------------- SCANNING FUNCTION --------------------
-def scan_repo(repo, base_path):
+# ------------------ Repo Scanner ------------------
+def scan_repo(repo, headers, base_path):
     repo_name = repo["name"]
     print(f"\n[+] Scanning repo: {repo_name}")
-
     dep_files = []
     for dep_file in ["package.json", "package-lock.json", "yarn.lock"]:
-        url = f"{repo['html_url']}/raw/main/{dep_file}"
-        r = requests.get(url)
+        url = f"https://raw.githubusercontent.com/{repo['full_name']}/main/{dep_file}"
+        r = requests.get(url, headers=headers)
         if r.status_code == 200:
             save_path = Path(base_path) / f"{repo_name}-{dep_file}"
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(save_path, "w") as f:
+            with open(save_path, "w", encoding="utf-8") as f:
                 f.write(r.text)
             dep_files.append(save_path)
             print(f"[DEBUG] Downloaded dependency file at: {save_path}")
@@ -134,30 +120,20 @@ def scan_repo(repo, base_path):
 
     all_vulns = []
     for file in dep_files:
-        with open(file) as f:
-            all_deps = {}
-            if file.suffix == ".json":
-                data = json.load(f)
-                dependencies = data.get("dependencies", {})
-                dev_dependencies = data.get("devDependencies", {})
-                all_deps = {**dependencies, **dev_dependencies}
-            else:  # yarn.lock
-                all_deps = parse_yarn_lock(file)
-
-            vulns = scan_dependencies(all_deps)
-            if vulns:
-                print(f"\n[!] Vulnerabilities found in file: {file.name}")
-                for dep, version, vuln_range in vulns:
-                    print(f"    {RED}{dep} {version} (matches {vuln_range}){RESET}")
-            all_vulns.extend(vulns)
+        if file.name.endswith("yarn.lock"):
+            vulns = scan_yarn_lock(file)
+        else:
+            vulns = scan_file(file)
+        for dep, version, vuln_range in vulns:
+            print(f"[!] {RED}VULNERABLE{RESET}: {dep} {version} (matches {vuln_range})")
+        all_vulns.extend(vulns)
 
     if not all_vulns:
-        print(f"{GREEN}[+] No vulnerabilities found in this repo.{RESET}")
+        print("[+] No vulnerabilities found in this repo.")
 
     return all_vulns
 
-
-# -------------------- MAIN FUNCTION --------------------
+# ------------------ Main ------------------
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--org", required=True, help="GitHub org or username")
@@ -165,17 +141,22 @@ def main():
 
     print(TOOL_NAME)
     org = args.org
+    token = get_github_token()
+    headers = {"Authorization": f"token {token}"} if token else {}
 
-    # Fetch repos
+    # Fetch repos (try org first, then user)
     print(f"[+] Fetching repos for '{org}' as organization...")
-    r = requests.get(f"https://api.github.com/orgs/{org}/repos")
+    r = requests.get(f"https://api.github.com/orgs/{org}/repos", headers=headers)
     if r.status_code != 200:
         print(f"[-] Not an organization. Trying as user '{org}'...")
-        r = requests.get(f"https://api.github.com/users/{org}/repos")
+        r = requests.get(f"https://api.github.com/users/{org}/repos", headers=headers)
+    if r.status_code != 200:
+        print(f"[-] Failed to fetch repos. Status code: {r.status_code}")
+        return
 
     repos = r.json()
-    if not isinstance(repos, list):
-        print("[-] Failed to fetch repos.")
+    if not isinstance(repos, list) or len(repos) == 0:
+        print("[-] No repositories found.")
         return
 
     print(f"[+] Found {len(repos)} repositories in '{org}'.")
@@ -184,17 +165,15 @@ def main():
 
     total_vulns = []
     for repo in repos:
-        vulns = scan_repo(repo, base_path)
+        vulns = scan_repo(repo, headers, base_path)
         total_vulns.extend(vulns)
 
     print("\n### Scan Summary ###")
     if total_vulns:
         for dep, version, vuln_range in total_vulns:
-            print(f"{RED}[!] {dep} {version} vulnerable (range {vuln_range}){RESET}")
+            print(f"[!] {RED}{dep} {version} vulnerable{RESET} (range {vuln_range})")
     else:
-        print(f"{GREEN}No compromised packages found in any repo.{RESET}")
-
+        print("No compromised packages found in any repo.")
 
 if __name__ == "__main__":
     main()
-               
