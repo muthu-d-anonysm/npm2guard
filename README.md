@@ -31,7 +31,7 @@ Requires Python 3.6 or higher.
   
 - python scanner.py --org target
 
-You will be prompted to enter your GitHub personal access token (recommended to use fine-grained tokens starting with `github_pat_`).
+You will be prompted to enter your GitHub personal access token (recommended to use Classic tokens starting with `ghp_`).
 
 
 2. Scan multiple organizations:
